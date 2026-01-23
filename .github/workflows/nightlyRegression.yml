@@ -1,0 +1,20 @@
+name: Nightly Regression
+on:
+  schedule:
+    - cron: "0 2 * * *" # 2am UTC todos los días
+  workflow_dispatch:
+
+jobs:
+  regression:
+    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test --project=full-regression
+        env:
+          BASE_URL: ${{ secrets.PROD_URL }}
