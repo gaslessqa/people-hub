@@ -1,0 +1,2124 @@
+openapi: 3.0.3
+info:
+  title: People Hub API
+  description: |
+    API para el sistema de gestion de RRHH People Hub.
+
+    ## Autenticacion
+    Todas las rutas (excepto auth) requieren un Bearer token JWT en el header Authorization.
+
+    ## Roles
+    - `recruiter`: Gestion operativa de personas y vacantes
+    - `manager`: Feedback y visualizacion de candidatos de sus vacantes
+    - `hr_admin`: Supervision, reportes y configuracion
+    - `super_admin`: Administracion completa del sistema
+  version: 1.0.0
+  contact:
+    name: People Hub Team
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development
+  - url: https://staging.people-hub.app/api
+    description: Staging
+  - url: https://people-hub.app/api
+    description: Production
+
+tags:
+  - name: Auth
+    description: Autenticacion y gestion de sesiones
+  - name: Users
+    description: Gestion de usuarios (super_admin)
+  - name: People
+    description: Gestion de personas (candidatos, empleados)
+  - name: Positions
+    description: Gestion de vacantes
+  - name: Feedback
+    description: Sistema de feedback y notas
+  - name: Dashboard
+    description: KPIs y reportes
+  - name: System
+    description: Health checks y configuracion
+
+paths:
+  # ============================================
+  # AUTH ENDPOINTS
+  # ============================================
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrar nuevo usuario
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              email: recruiter@company.com
+              password: SecurePass123
+              full_name: Ana Garcia
+      responses:
+        '201':
+          description: Usuario creado, email de verificacion enviado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Validation error o email ya existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesion
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Credenciales invalidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Usuario deshabilitado o email no verificado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesion
+      operationId: logoutUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sesion cerrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Solicitar reset de password
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Si el email existe, se envio link de reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Confirmar reset de password
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Token invalido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Obtener usuario actual
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Datos del usuario actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  # ============================================
+  # USERS ENDPOINTS (Super Admin)
+  # ============================================
+  /users:
+    get:
+      tags: [Users]
+      summary: Listar usuarios
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/UserRole'
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersListResponse'
+        '403':
+          description: Solo super_admin puede listar usuarios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Users]
+      summary: Crear usuario
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '403':
+          description: Solo super_admin puede crear usuarios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Obtener usuario por ID
+      operationId: getUserById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Datos del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: Usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Users]
+      summary: Actualizar usuario
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+    delete:
+      tags: [Users]
+      summary: Desactivar usuario
+      operationId: deactivateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Usuario desactivado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ============================================
+  # PEOPLE ENDPOINTS
+  # ============================================
+  /people:
+    get:
+      tags: [People]
+      summary: Listar personas
+      operationId: listPeople
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status_type
+          in: query
+          schema:
+            $ref: '#/components/schemas/StatusType'
+        - name: status_value
+          in: query
+          schema:
+            type: string
+        - name: position_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Lista de personas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeopleListResponse'
+
+    post:
+      tags: [People]
+      summary: Crear persona
+      operationId: createPerson
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePersonRequest'
+      responses:
+        '201':
+          description: Persona creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /people/search:
+    get:
+      tags: [People]
+      summary: Buscar personas
+      operationId: searchPeople
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+          description: Termino de busqueda (nombre, email, telefono)
+        - name: search_type
+          in: query
+          schema:
+            type: string
+            enum: [all, name, email, phone]
+            default: all
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Resultados de busqueda
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+
+  /people/{personId}:
+    get:
+      tags: [People]
+      summary: Obtener persona por ID
+      operationId: getPersonById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonIdParam'
+      responses:
+        '200':
+          description: Perfil completo de persona
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonDetailResponse'
+        '404':
+          description: Persona no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [People]
+      summary: Actualizar persona
+      operationId: updatePerson
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePersonRequest'
+      responses:
+        '200':
+          description: Persona actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonResponse'
+
+  /people/{personId}/status:
+    post:
+      tags: [People]
+      summary: Cambiar estado de persona
+      operationId: changePersonStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeStatusRequest'
+      responses:
+        '200':
+          description: Estado cambiado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusChangeResponse'
+        '400':
+          description: Transicion de estado invalida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /people/{personId}/timeline:
+    get:
+      tags: [People]
+      summary: Obtener timeline de actividad
+      operationId: getPersonTimeline
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonIdParam'
+        - name: type
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [note, feedback, status_change, assignment]
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Timeline de actividad
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelineResponse'
+
+  # ============================================
+  # POSITIONS ENDPOINTS
+  # ============================================
+  /positions:
+    get:
+      tags: [Positions]
+      summary: Listar vacantes
+      operationId: listPositions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, on_hold, closed]
+        - name: recruiter_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: hiring_manager_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Lista de vacantes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionsListResponse'
+
+    post:
+      tags: [Positions]
+      summary: Crear vacante
+      operationId: createPosition
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePositionRequest'
+      responses:
+        '201':
+          description: Vacante creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionResponse'
+
+  /positions/{positionId}:
+    get:
+      tags: [Positions]
+      summary: Obtener vacante por ID
+      operationId: getPositionById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PositionIdParam'
+      responses:
+        '200':
+          description: Detalle de vacante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionDetailResponse'
+
+    patch:
+      tags: [Positions]
+      summary: Actualizar vacante
+      operationId: updatePosition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PositionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePositionRequest'
+      responses:
+        '200':
+          description: Vacante actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionResponse'
+
+  /positions/{positionId}/pipeline:
+    get:
+      tags: [Positions]
+      summary: Obtener pipeline de vacante (Kanban)
+      operationId: getPositionPipeline
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PositionIdParam'
+      responses:
+        '200':
+          description: Pipeline con candidatos por etapa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineResponse'
+
+  /positions/{positionId}/candidates:
+    post:
+      tags: [Positions]
+      summary: Asignar candidato a vacante
+      operationId: assignCandidate
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PositionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignCandidateRequest'
+      responses:
+        '201':
+          description: Candidato asignado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentResponse'
+        '400':
+          description: Ya asignado o vacante cerrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /positions/{positionId}/close:
+    post:
+      tags: [Positions]
+      summary: Cerrar vacante
+      operationId: closePosition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PositionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClosePositionRequest'
+      responses:
+        '200':
+          description: Vacante cerrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionResponse'
+
+  # ============================================
+  # FEEDBACK ENDPOINTS
+  # ============================================
+  /feedback:
+    post:
+      tags: [Feedback]
+      summary: Crear feedback de entrevista
+      operationId: createFeedback
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeedbackRequest'
+      responses:
+        '201':
+          description: Feedback creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackResponse'
+        '400':
+          description: Persona no asignada a vacante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /people/{personId}/feedback:
+    get:
+      tags: [Feedback]
+      summary: Obtener feedback de persona
+      operationId: getPersonFeedback
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonIdParam'
+        - name: position_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de feedback
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackListResponse'
+
+  /people/{personId}/notes:
+    get:
+      tags: [Feedback]
+      summary: Obtener notas de persona
+      operationId: getPersonNotes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonIdParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Lista de notas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotesListResponse'
+
+    post:
+      tags: [Feedback]
+      summary: Crear nota
+      operationId: createNote
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNoteRequest'
+      responses:
+        '201':
+          description: Nota creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+
+  # ============================================
+  # DASHBOARD ENDPOINTS
+  # ============================================
+  /dashboard/kpis:
+    get:
+      tags: [Dashboard]
+      summary: Obtener KPIs principales
+      operationId: getDashboardKPIs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, quarter, year]
+            default: month
+        - name: compare_previous
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: KPIs del dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardKPIsResponse'
+
+  /dashboard/time-to-hire:
+    get:
+      tags: [Dashboard]
+      summary: Obtener tiempo promedio de contratacion
+      operationId: getTimeToHire
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: position_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Metricas de tiempo de contratacion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeToHireResponse'
+
+  /dashboard/workload:
+    get:
+      tags: [Dashboard]
+      summary: Obtener carga de trabajo
+      operationId: getWorkload
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recruiter_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Solo admins pueden ver otros recruiters
+      responses:
+        '200':
+          description: Carga de trabajo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkloadResponse'
+
+  # ============================================
+  # SYSTEM ENDPOINTS
+  # ============================================
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Sistema operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /status-definitions:
+    get:
+      tags: [System]
+      summary: Obtener estados configurados
+      operationId: getStatusDefinitions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status_type
+          in: query
+          schema:
+            $ref: '#/components/schemas/StatusType'
+      responses:
+        '200':
+          description: Lista de estados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusDefinitionsResponse'
+
+    post:
+      tags: [System]
+      summary: Crear estado (hr_admin+)
+      operationId: createStatusDefinition
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStatusDefinitionRequest'
+      responses:
+        '201':
+          description: Estado creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusDefinitionResponse'
+
+  /user-preferences:
+    get:
+      tags: [System]
+      summary: Obtener preferencias de usuario
+      operationId: getUserPreferences
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Preferencias del usuario actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferencesResponse'
+
+    patch:
+      tags: [System]
+      summary: Actualizar preferencias
+      operationId: updateUserPreferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferencesRequest'
+      responses:
+        '200':
+          description: Preferencias actualizadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferencesResponse'
+
+# ============================================
+# COMPONENTS
+# ============================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PersonIdParam:
+      name: personId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PositionIdParam:
+      name: positionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    OffsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  schemas:
+    # ---------- Enums ----------
+    UserRole:
+      type: string
+      enum: [recruiter, manager, hr_admin, super_admin]
+
+    StatusType:
+      type: string
+      enum: [candidate, employee, external]
+
+    EmploymentType:
+      type: string
+      enum: [full_time, part_time, contract, internship]
+
+    PositionStatus:
+      type: string
+      enum: [open, on_hold, closed]
+
+    CloseReason:
+      type: string
+      enum: [filled, cancelled, on_hold]
+
+    PipelineStage:
+      type: string
+      enum: [applied, screening, interviewing, finalist, offer, hired, rejected]
+
+    FeedbackType:
+      type: string
+      enum: [technical, cultural, final, other]
+
+    Recommendation:
+      type: string
+      enum: [strong_yes, yes, maybe, no, strong_no]
+
+    PersonSource:
+      type: string
+      enum: [linkedin, referral, job_board, direct, other]
+
+    Priority:
+      type: string
+      enum: [low, medium, high, urgent]
+
+    # ---------- Common Responses ----------
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+            field:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        has_more:
+          type: boolean
+
+    # ---------- Auth Schemas ----------
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 8
+        full_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+
+    RegisterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        userId:
+          type: string
+          format: uuid
+        message:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        session:
+          type: object
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+
+    # ---------- User Schemas ----------
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        full_name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        user:
+          allOf:
+            - $ref: '#/components/schemas/UserSummary'
+            - type: object
+              properties:
+                is_active:
+                  type: boolean
+                created_at:
+                  type: string
+                  format: date-time
+                updated_at:
+                  type: string
+                  format: date-time
+
+    UsersListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummary'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    CreateUserRequest:
+      type: object
+      required: [email, full_name, role]
+      properties:
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        password:
+          type: string
+          description: Si no se provee, se genera y envia por email
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+
+    # ---------- Person Schemas ----------
+    PersonSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        email:
+          type: string
+        status:
+          type: object
+          properties:
+            type:
+              $ref: '#/components/schemas/StatusType'
+            value:
+              type: string
+            label:
+              type: string
+            color:
+              type: string
+        last_activity:
+          type: string
+          format: date-time
+
+    PersonResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        person:
+          $ref: '#/components/schemas/PersonSummary'
+
+    PersonDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        person:
+          allOf:
+            - $ref: '#/components/schemas/PersonSummary'
+            - type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                phone:
+                  type: string
+                linkedin_url:
+                  type: string
+                current_company:
+                  type: string
+                current_position:
+                  type: string
+                location:
+                  type: string
+                source:
+                  $ref: '#/components/schemas/PersonSource'
+                created_at:
+                  type: string
+                  format: date-time
+                updated_at:
+                  type: string
+                  format: date-time
+                created_by:
+                  $ref: '#/components/schemas/UserSummary'
+                statuses:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      status_type:
+                        type: string
+                      status_value:
+                        type: string
+                      since:
+                        type: string
+                        format: date-time
+                positions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      position_id:
+                        type: string
+                        format: uuid
+                      title:
+                        type: string
+                      stage:
+                        $ref: '#/components/schemas/PipelineStage'
+                      assigned_at:
+                        type: string
+                        format: date-time
+
+    PeopleListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        people:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonSummary'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    SearchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        results:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/PersonSummary'
+              - type: object
+                properties:
+                  match_score:
+                    type: number
+        total_count:
+          type: integer
+
+    CreatePersonRequest:
+      type: object
+      required: [first_name, last_name, email]
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        linkedin_url:
+          type: string
+          format: uri
+        current_company:
+          type: string
+        current_position:
+          type: string
+        location:
+          type: string
+        source:
+          $ref: '#/components/schemas/PersonSource'
+        notes:
+          type: string
+        initial_status:
+          type: string
+
+    UpdatePersonRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        linkedin_url:
+          type: string
+        current_company:
+          type: string
+        current_position:
+          type: string
+        location:
+          type: string
+
+    ChangeStatusRequest:
+      type: object
+      required: [status_type, status_value]
+      properties:
+        status_type:
+          $ref: '#/components/schemas/StatusType'
+        status_value:
+          type: string
+        comment:
+          type: string
+        position_id:
+          type: string
+          format: uuid
+
+    StatusChangeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        new_status:
+          type: object
+          properties:
+            type:
+              type: string
+            value:
+              type: string
+            since:
+              type: string
+              format: date-time
+
+    TimelineResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              type:
+                type: string
+                enum: [note, feedback, status_change, assignment, edit]
+              content:
+                type: object
+              created_at:
+                type: string
+                format: date-time
+              created_by:
+                $ref: '#/components/schemas/UserSummary'
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+            limit:
+              type: integer
+            offset:
+              type: integer
+            has_more:
+              type: boolean
+
+    # ---------- Position Schemas ----------
+    PositionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        department:
+          type: string
+        status:
+          $ref: '#/components/schemas/PositionStatus'
+        priority:
+          $ref: '#/components/schemas/Priority'
+        recruiter:
+          $ref: '#/components/schemas/UserSummary'
+        hiring_manager:
+          $ref: '#/components/schemas/UserSummary'
+        candidate_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    PositionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        position:
+          $ref: '#/components/schemas/PositionSummary'
+
+    PositionDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        position:
+          allOf:
+            - $ref: '#/components/schemas/PositionSummary'
+            - type: object
+              properties:
+                description:
+                  type: string
+                requirements:
+                  type: string
+                location:
+                  type: string
+                employment_type:
+                  $ref: '#/components/schemas/EmploymentType'
+                salary_min:
+                  type: integer
+                salary_max:
+                  type: integer
+                salary_currency:
+                  type: string
+                close_reason:
+                  $ref: '#/components/schemas/CloseReason'
+                hired_person:
+                  $ref: '#/components/schemas/PersonSummary'
+                closed_at:
+                  type: string
+                  format: date-time
+                updated_at:
+                  type: string
+                  format: date-time
+
+    PositionsListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PositionSummary'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    CreatePositionRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 100
+        department:
+          type: string
+        description:
+          type: string
+        requirements:
+          type: string
+        location:
+          type: string
+        employment_type:
+          $ref: '#/components/schemas/EmploymentType'
+        salary_min:
+          type: integer
+        salary_max:
+          type: integer
+        salary_currency:
+          type: string
+        hiring_manager_id:
+          type: string
+          format: uuid
+        recruiter_id:
+          type: string
+          format: uuid
+        priority:
+          $ref: '#/components/schemas/Priority'
+
+    UpdatePositionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        department:
+          type: string
+        description:
+          type: string
+        requirements:
+          type: string
+        location:
+          type: string
+        employment_type:
+          $ref: '#/components/schemas/EmploymentType'
+        salary_min:
+          type: integer
+        salary_max:
+          type: integer
+        salary_currency:
+          type: string
+        hiring_manager_id:
+          type: string
+          format: uuid
+        recruiter_id:
+          type: string
+          format: uuid
+        priority:
+          $ref: '#/components/schemas/Priority'
+        status:
+          $ref: '#/components/schemas/PositionStatus'
+
+    PipelineResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        position:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            title:
+              type: string
+            status:
+              type: string
+            hiring_manager:
+              $ref: '#/components/schemas/UserSummary'
+            recruiter:
+              $ref: '#/components/schemas/UserSummary'
+        pipeline:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              properties:
+                person_id:
+                  type: string
+                  format: uuid
+                full_name:
+                  type: string
+                days_in_stage:
+                  type: integer
+                last_feedback_date:
+                  type: string
+                  format: date-time
+        stats:
+          type: object
+          properties:
+            total_candidates:
+              type: integer
+            avg_days_to_hire:
+              type: number
+            conversion_rates:
+              type: object
+
+    AssignCandidateRequest:
+      type: object
+      required: [person_id]
+      properties:
+        person_id:
+          type: string
+          format: uuid
+        initial_stage:
+          $ref: '#/components/schemas/PipelineStage'
+        comment:
+          type: string
+
+    AssignmentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        assignment:
+          type: object
+          properties:
+            person_id:
+              type: string
+              format: uuid
+            position_id:
+              type: string
+              format: uuid
+            stage:
+              type: string
+            assigned_at:
+              type: string
+              format: date-time
+
+    ClosePositionRequest:
+      type: object
+      required: [close_reason]
+      properties:
+        close_reason:
+          $ref: '#/components/schemas/CloseReason'
+        hired_person_id:
+          type: string
+          format: uuid
+          description: Requerido si close_reason es filled
+        comment:
+          type: string
+
+    # ---------- Feedback Schemas ----------
+    FeedbackSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        position:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            title:
+              type: string
+        feedback_type:
+          $ref: '#/components/schemas/FeedbackType'
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        recommendation:
+          $ref: '#/components/schemas/Recommendation'
+        is_confidential:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          $ref: '#/components/schemas/UserSummary'
+
+    FeedbackResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        feedback:
+          $ref: '#/components/schemas/FeedbackSummary'
+
+    FeedbackListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        feedback:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/FeedbackSummary'
+              - type: object
+                properties:
+                  strengths:
+                    type: string
+                  concerns:
+                    type: string
+                  comments:
+                    type: string
+        summary:
+          type: object
+          properties:
+            avg_rating:
+              type: number
+            recommendation_breakdown:
+              type: object
+            total_feedback:
+              type: integer
+
+    CreateFeedbackRequest:
+      type: object
+      required: [person_id, position_id, feedback_type, rating, recommendation, comments]
+      properties:
+        person_id:
+          type: string
+          format: uuid
+        position_id:
+          type: string
+          format: uuid
+        feedback_type:
+          $ref: '#/components/schemas/FeedbackType'
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        recommendation:
+          $ref: '#/components/schemas/Recommendation'
+        strengths:
+          type: string
+        concerns:
+          type: string
+        comments:
+          type: string
+        is_confidential:
+          type: boolean
+          default: false
+
+    # ---------- Notes Schemas ----------
+    NoteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        note:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            content:
+              type: string
+            is_private:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+            created_by:
+              $ref: '#/components/schemas/UserSummary'
+
+    NotesListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        notes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              content:
+                type: string
+              is_private:
+                type: boolean
+              created_at:
+                type: string
+                format: date-time
+              created_by:
+                $ref: '#/components/schemas/UserSummary'
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+            limit:
+              type: integer
+            offset:
+              type: integer
+            has_more:
+              type: boolean
+
+    CreateNoteRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        is_private:
+          type: boolean
+          default: false
+
+    # ---------- Dashboard Schemas ----------
+    DashboardKPIsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        period:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+        kpis:
+          type: object
+          properties:
+            open_positions:
+              $ref: '#/components/schemas/KPIValue'
+            total_candidates:
+              $ref: '#/components/schemas/KPIValue'
+            hires_this_period:
+              $ref: '#/components/schemas/KPIValue'
+            avg_time_to_hire_days:
+              $ref: '#/components/schemas/KPIValue'
+            offer_acceptance_rate:
+              $ref: '#/components/schemas/KPIValue'
+        funnel:
+          type: object
+          properties:
+            applied:
+              type: integer
+            screening:
+              type: integer
+            interviewing:
+              type: integer
+            finalist:
+              type: integer
+            offer:
+              type: integer
+            hired:
+              type: integer
+            conversion_rates:
+              type: object
+        recent_activity:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              description:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+
+    KPIValue:
+      type: object
+      properties:
+        value:
+          type: number
+        delta:
+          type: number
+        trend:
+          type: string
+          enum: [up, down, flat]
+
+    TimeToHireResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        time_to_hire:
+          type: object
+          properties:
+            avg_days:
+              type: number
+            median_days:
+              type: number
+            min_days:
+              type: number
+            max_days:
+              type: number
+            total_hires:
+              type: integer
+        by_department:
+          type: array
+          items:
+            type: object
+            properties:
+              department:
+                type: string
+              avg_days:
+                type: number
+              hires:
+                type: integer
+        trend:
+          type: array
+          items:
+            type: object
+            properties:
+              period:
+                type: string
+              avg_days:
+                type: number
+
+    WorkloadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        workload:
+          type: object
+          properties:
+            open_positions:
+              type: integer
+            total_active_candidates:
+              type: integer
+            by_stage:
+              type: object
+              additionalProperties:
+                type: integer
+            pending_actions:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  person_id:
+                    type: string
+                    format: uuid
+                  person_name:
+                    type: string
+                  days_stale:
+                    type: integer
+
+    # ---------- System Schemas ----------
+    StatusDefinitionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        status:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            status_type:
+              $ref: '#/components/schemas/StatusType'
+            status_value:
+              type: string
+            label:
+              type: string
+            color:
+              type: string
+            order_index:
+              type: integer
+            is_active:
+              type: boolean
+            person_count:
+              type: integer
+
+    StatusDefinitionsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        statuses:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              status_type:
+                $ref: '#/components/schemas/StatusType'
+              status_value:
+                type: string
+              label:
+                type: string
+              color:
+                type: string
+              order_index:
+                type: integer
+              is_active:
+                type: boolean
+              person_count:
+                type: integer
+
+    CreateStatusDefinitionRequest:
+      type: object
+      required: [status_type, status_value, label, color]
+      properties:
+        status_type:
+          $ref: '#/components/schemas/StatusType'
+        status_value:
+          type: string
+          pattern: '^[a-z_]+$'
+          maxLength: 50
+        label:
+          type: string
+          maxLength: 50
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        order_index:
+          type: integer
+
+    UserPreferencesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        preferences:
+          type: object
+          properties:
+            notifications:
+              type: object
+              properties:
+                new_candidate:
+                  type: boolean
+                new_feedback:
+                  type: boolean
+                status_change:
+                  type: boolean
+                position_closed:
+                  type: boolean
+                weekly_digest:
+                  type: boolean
+            ui:
+              type: object
+              properties:
+                theme:
+                  type: string
+                  enum: [light, dark, system]
+                default_view:
+                  type: string
+
+    UpdatePreferencesRequest:
+      type: object
+      properties:
+        notifications:
+          type: object
+          additionalProperties:
+            type: boolean
+        ui:
+          type: object
+          additionalProperties:
+            type: string
