@@ -605,7 +605,7 @@ Estas funcionalidades están planeadas pero NO en el MVP:
 | Mobile app   | Focus en web first     | v2.0          |
 | SSO/SAML     | Solo para enterprise   | v1.5          |
 | API pública  | Requiere más seguridad | v1.3          |
-| Multi-idioma | Latam primero          | v2.0          |
+| Multi-idioma | Castellano primero     | v2.0          |
 | AI training  | Dataset insuficiente   | v1.5          |
 ```
 
@@ -664,25 +664,25 @@ PASO 1 ──→ PASO 2 ──→ PASO 3 ──→ PASO 4 ──→ GOAL
 
 ```
 
-| Paso | Acción del Usuario | Respuesta del Sistema | Pantalla |
-|------|-------------------|----------------------|----------|
-| 1 | [Acción] | [Respuesta] | [Pantalla] |
-| 2 | [Acción] | [Respuesta] | [Pantalla] |
-| 3 | [Acción] | [Respuesta] | [Pantalla] |
+| Paso | Acción del Usuario | Respuesta del Sistema | Pantalla   |
+| ---- | ------------------ | --------------------- | ---------- |
+| 1    | [Acción]           | [Respuesta]           | [Pantalla] |
+| 2    | [Acción]           | [Respuesta]           | [Pantalla] |
+| 3    | [Acción]           | [Respuesta]           | [Pantalla] |
 
 #### Edge Cases
 
-| Caso | Qué pasa | Cómo se maneja |
-|------|----------|----------------|
-| [Edge case 1] | [Descripción] | [Solución] |
-| [Edge case 2] | [Descripción] | [Solución] |
+| Caso          | Qué pasa      | Cómo se maneja |
+| ------------- | ------------- | -------------- |
+| [Edge case 1] | [Descripción] | [Solución]     |
+| [Edge case 2] | [Descripción] | [Solución]     |
 
 #### Error Scenarios
 
-| Error | Causa | Mensaje al usuario | Recovery |
-|-------|-------|-------------------|----------|
-| [Error 1] | [Causa] | "[Mensaje]" | [Qué puede hacer] |
-| [Error 2] | [Causa] | "[Mensaje]" | [Qué puede hacer] |
+| Error     | Causa   | Mensaje al usuario | Recovery          |
+| --------- | ------- | ------------------ | ----------------- |
+| [Error 1] | [Causa] | "[Mensaje]"        | [Qué puede hacer] |
+| [Error 2] | [Causa] | "[Mensaje]"        | [Qué puede hacer] |
 ```
 
 **Ejemplo:**
@@ -705,29 +705,29 @@ existe story tests aprueba Xray
 
 ```
 
-| Paso | Acción del Usuario | Respuesta del Sistema | Pantalla |
-|------|-------------------|----------------------|----------|
-| 1 | Click en "Import from Jira" | Muestra lista de proyectos Jira | Dashboard |
-| 2 | Selecciona proyecto y story | Carga story con AC | Import modal |
-| 3 | Click en "Generate Tests" | Muestra loading, luego tests | Generator |
-| 4 | Revisa tests, edita si necesario | Guarda cambios | Editor |
-| 5 | Click en "Export to Xray" | Confirma export exitoso | Export modal |
+| Paso | Acción del Usuario               | Respuesta del Sistema           | Pantalla     |
+| ---- | -------------------------------- | ------------------------------- | ------------ |
+| 1    | Click en "Import from Jira"      | Muestra lista de proyectos Jira | Dashboard    |
+| 2    | Selecciona proyecto y story      | Carga story con AC              | Import modal |
+| 3    | Click en "Generate Tests"        | Muestra loading, luego tests    | Generator    |
+| 4    | Revisa tests, edita si necesario | Guarda cambios                  | Editor       |
+| 5    | Click en "Export to Xray"        | Confirma export exitoso         | Export modal |
 
 #### Edge Cases
 
-| Caso | Qué pasa | Cómo se maneja |
-|------|----------|----------------|
-| Story sin AC | No hay de dónde generar | Mensaje: "Agrega AC a la story primero" |
-| Jira desconectado | No puede importar | Botón reconectar + instrucciones |
-| Tests ya existen | Posible duplicación | Pregunta: "¿Reemplazar o agregar?" |
+| Caso              | Qué pasa                | Cómo se maneja                          |
+| ----------------- | ----------------------- | --------------------------------------- |
+| Story sin AC      | No hay de dónde generar | Mensaje: "Agrega AC a la story primero" |
+| Jira desconectado | No puede importar       | Botón reconectar + instrucciones        |
+| Tests ya existen  | Posible duplicación     | Pregunta: "¿Reemplazar o agregar?"      |
 
 #### Error Scenarios
 
-| Error | Causa | Mensaje al usuario | Recovery |
-|-------|-------|-------------------|----------|
-| Jira auth expiró | Token venció | "Reconecta tu cuenta Jira" | Link a settings |
-| AI timeout | Story muy larga | "La generación tardó mucho. Intenta con story más corta" | Retry button |
-| Export failed | Xray no disponible | "No se pudo exportar. Guardado localmente." | Download JSON |
+| Error            | Causa              | Mensaje al usuario                                       | Recovery        |
+| ---------------- | ------------------ | -------------------------------------------------------- | --------------- |
+| Jira auth expiró | Token venció       | "Reconecta tu cuenta Jira"                               | Link a settings |
+| AI timeout       | Story muy larga    | "La generación tardó mucho. Intenta con story más corta" | Retry button    |
+| Export failed    | Xray no disponible | "No se pudo exportar. Guardado localmente."              | Download JSON   |
 ```
 
 ---
