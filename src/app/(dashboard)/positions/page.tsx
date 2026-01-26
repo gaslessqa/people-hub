@@ -220,7 +220,7 @@ function PositionCard({ position }: { position: PositionWithRelations }) {
     ).length || 0;
 
   const status = statusStyles[position.status] || statusStyles.open;
-  const priority = priorityStyles[position.priority] || priorityStyles.medium;
+  const priority = priorityStyles[position.priority ?? 'medium'] || priorityStyles.medium;
 
   return (
     <Card className="hover:border-primary/50 transition-colors">
@@ -261,7 +261,9 @@ function PositionCard({ position }: { position: PositionWithRelations }) {
 
         <div className="flex items-center justify-between pt-2 border-t">
           <span className="text-xs text-muted-foreground">
-            {employmentTypeLabels[position.employment_type] || position.employment_type}
+            {position.employment_type
+              ? employmentTypeLabels[position.employment_type] || position.employment_type
+              : 'No especificado'}
           </span>
           <Badge variant="secondary" className={status.bg}>
             {status.label}

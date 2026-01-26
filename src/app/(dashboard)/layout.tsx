@@ -29,13 +29,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get('sidebar_state')?.value !== 'false';
 
-  const handleSignOut = async () => {
-    'use server';
-    const supabase = await createClient();
-    await supabase.auth.signOut();
-    redirect('/login');
-  };
-
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar
@@ -48,7 +41,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
               }
             : undefined
         }
-        onSignOut={handleSignOut}
       />
       <SidebarInset>
         <AppHeader />

@@ -12,6 +12,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
+import { useAuth } from '@/contexts/auth-context';
 import {
   Sidebar,
   SidebarContent,
@@ -72,13 +73,24 @@ interface AppSidebarProps {
     email: string;
     role: string;
   };
-  onSignOut?: () => void;
 }
 
-export function AppSidebar({ user, onSignOut }: AppSidebarProps) {
+export function AppSidebar({ user: userProp }: AppSidebarProps) {
   const pathname = usePathname();
   const { state } = useSidebar();
+  const { profile, signOut } = useAuth();
   const isCollapsed = state === 'collapsed';
+
+  // Use prop if provided (server-side data), otherwise use context
+  const user =
+    userProp ||
+    (profile
+      ? {
+          name: profile.full_name,
+          email: profile.email,
+          role: profile.role,
+        }
+      : undefined);
 
   const getInitials = (name: string) => {
     return name
@@ -211,7 +223,7 @@ export function AppSidebar({ user, onSignOut }: AppSidebarProps) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onSignOut} className="text-destructive">
+                <DropdownMenuItem onClick={signOut} className="text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Cerrar sesión
                 </DropdownMenuItem>
