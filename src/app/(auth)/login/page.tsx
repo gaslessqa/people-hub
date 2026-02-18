@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/form';
 import { PasswordInput } from '@/components/ui/password-input';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 const demoCredentials = [
   { email: 'admin@peoplehub.dev', password: 'Admin123!', role: 'Super Admin' },
   { email: 'hr@peoplehub.dev', password: 'HrAdmin123!', role: 'HR Admin' },
@@ -74,25 +76,27 @@ export default function LoginPage() {
           <CardDescription>Plataforma de gestión de RRHH</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Demo credentials alert */}
-          <Alert className="bg-blue-50 border-blue-200">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-800 text-sm font-medium">
-              Credenciales de Prueba
-            </AlertTitle>
-            <AlertDescription className="text-blue-700 text-xs mt-2 space-y-1">
-              {demoCredentials.map((cred, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => handleDemoLogin(cred.email, cred.password)}
-                  className="block w-full text-left hover:bg-blue-100 p-1 rounded transition-colors"
-                >
-                  <span className="font-medium">{cred.role}:</span> {cred.email}
-                </button>
-              ))}
-            </AlertDescription>
-          </Alert>
+          {/* Demo credentials alert — development only */}
+          {isDev && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertTitle className="text-blue-800 text-sm font-medium">
+                Credenciales de Prueba
+              </AlertTitle>
+              <AlertDescription className="text-blue-700 text-xs mt-2 space-y-1">
+                {demoCredentials.map(cred => (
+                  <button
+                    key={cred.email}
+                    type="button"
+                    onClick={() => handleDemoLogin(cred.email, cred.password)}
+                    className="block w-full text-left hover:bg-blue-100 p-1 rounded transition-colors"
+                  >
+                    <span className="font-medium">{cred.role}:</span> {cred.email}
+                  </button>
+                ))}
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>

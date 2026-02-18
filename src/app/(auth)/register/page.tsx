@@ -24,7 +24,7 @@ import {
 import { PasswordInput } from '@/components/ui/password-input';
 
 export default function RegisterPage() {
-  const { signUp } = useAuth();
+  const { signUp, resendConfirmation } = useAuth();
   const [showSuccess, setShowSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
 
@@ -80,9 +80,11 @@ export default function RegisterPage() {
                 type="button"
                 className="text-primary hover:underline font-medium"
                 onClick={async () => {
-                  const { error } = await signUp(registeredEmail, '****', 'resend');
+                  const { error } = await resendConfirmation(registeredEmail);
                   if (!error) {
                     toast.success('Email de confirmación reenviado');
+                  } else {
+                    toast.error('No se pudo reenviar el email. Intenta de nuevo.');
                   }
                 }}
                 data-testid="register-resend-btn"

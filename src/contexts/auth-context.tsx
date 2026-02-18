@@ -27,6 +27,7 @@ interface AuthContextValue extends AuthState {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  resendConfirmation: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 }
 
@@ -76,11 +77,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error.message);
         return null;
       }
 
       return data;
+    },
+    [supabase]
+  );
+
+  /**
+   * Resend the signup confirmation email
+   */
+  const resendConfirmation = useCallback(
+    async (email: string): Promise<{ error: string | null }> => {
+      const { error } = await supabase.auth.resend({ type: 'signup', email });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { error: null };
     },
     [supabase]
   );
@@ -301,6 +317,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signOut,
     refreshProfile,
     requestPasswordReset,
+    resendConfirmation,
     updatePassword,
   };
 

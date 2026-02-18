@@ -20,8 +20,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const body = await request.json();
-    const { is_active } = body as { is_active: boolean };
+    const body: unknown = await request.json();
+    const is_active =
+      body !== null && typeof body === 'object' && 'is_active' in body
+        ? (body as Record<string, unknown>).is_active
+        : undefined;
 
     if (typeof is_active !== 'boolean') {
       return NextResponse.json({ error: 'El campo is_active es requerido.' }, { status: 400 });
