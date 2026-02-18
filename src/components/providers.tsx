@@ -1,5 +1,6 @@
 'use client';
 
+import { Toaster } from 'sonner';
 import { AuthProvider } from '@/contexts/auth-context';
 
 interface ProvidersProps {
@@ -13,5 +14,10 @@ interface ProvidersProps {
  * Add new providers here to make them available throughout the app.
  */
 export function Providers({ children }: ProvidersProps) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <AuthProvider>
+      {children}
+      <Toaster position="top-right" richColors />
+    </AuthProvider>
+  );
 }

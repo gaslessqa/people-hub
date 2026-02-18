@@ -22,9 +22,12 @@ interface AuthState {
  * Auth context value interface
  */
 interface AuthContextValue extends AuthState {
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 }
 
 /**
@@ -83,6 +86,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   /**
+   * Request a password reset email
+   */
+  const requestPasswordReset = useCallback(
+    async (email: string): Promise<{ error: string | null }> => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { error: null };
+    },
+    [supabase]
+  );
+
+  /**
+   * Update the current user's password (used after reset flow)
+   */
+  const updatePassword = useCallback(
+    async (newPassword: string): Promise<{ error: string | null }> => {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { error: null };
+    },
+    [supabase]
+  );
+
+  /**
    * Refresh the current user's profile
    */
   const refreshProfile = useCallback(async () => {
@@ -93,13 +130,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [state.user, fetchProfile]);
 
   /**
-   * Sign in with email and password
+   * Sign up with email, password and full name
+   */
+  const signUp = useCallback(
+    async (
+      email: string,
+      password: string,
+      fullName: string
+    ): Promise<{ error: string | null }> => {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName },
+        },
+      });
+
+      if (error) {
+        let errorMessage = error.message;
+        if (
+          error.message.includes('already registered') ||
+          error.message.includes('already been registered')
+        ) {
+          errorMessage = 'Este email ya está registrado. Por favor usa otro email.';
+        }
+        return { error: errorMessage };
+      }
+
+      return { error: null };
+    },
+    [supabase]
+  );
+
+  /**
+   * Sign in with email and password.
+   * Checks is_active after successful auth to block deactivated accounts.
    */
   const signIn = useCallback(
     async (email: string, password: string): Promise<{ error: string | null }> => {
       setState(prev => ({ ...prev, loading: true, error: null }));
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -117,10 +188,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return { error: errorMessage };
       }
 
-      // Auth state change listener will handle the rest
+      // Post-auth: verify the account is active
+      if (data.user) {
+        const profile = await fetchProfile(data.user.id);
+
+        if (profile && !profile.is_active) {
+          // Sign out immediately — account is deactivated
+          await supabase.auth.signOut({ scope: 'local' });
+          const deactivatedError = 'Tu cuenta ha sido desactivada. Contacta al administrador.';
+          setState(prev => ({ ...prev, loading: false, error: deactivatedError }));
+          return { error: deactivatedError };
+        }
+      }
+
+      // Auth state change listener will handle setting the state
       return { error: null };
     },
-    [supabase]
+    [supabase, fetchProfile]
   );
 
   /**
@@ -212,9 +296,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextValue = {
     ...state,
+    signUp,
     signIn,
     signOut,
     refreshProfile,
+    requestPasswordReset,
+    updatePassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

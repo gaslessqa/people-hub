@@ -1,17 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Users, Loader2, Info } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/contexts/auth-context';
+import { loginSchema, type LoginFormData } from '@/lib/schemas/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { PasswordInput } from '@/components/ui/password-input';
 
-// Demo credentials - these match users created in backend setup
 const demoCredentials = [
   { email: 'admin@peoplehub.dev', password: 'Admin123!', role: 'Super Admin' },
   { email: 'hr@peoplehub.dev', password: 'HrAdmin123!', role: 'HR Admin' },
@@ -21,54 +32,37 @@ const demoCredentials = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { signIn } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
 
-    try {
-      const supabase = createClient();
+  const { isSubmitting } = form.formState;
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+  const onSubmit = async (data: LoginFormData) => {
+    const { error } = await signIn(data.email, data.password);
 
-      if (signInError) {
-        if (signInError.message.includes('Invalid login credentials')) {
-          setError('Credenciales incorrectas. Por favor verifica tu email y contraseña.');
-        } else if (signInError.message.includes('Email not confirmed')) {
-          setError('Por favor confirma tu email antes de iniciar sesión.');
-        } else {
-          setError(signInError.message);
-        }
-        return;
-      }
-
-      // Redirect to dashboard on success
-      router.push('/dashboard');
-      router.refresh();
-    } catch (err) {
-      setError('Ocurrió un error inesperado. Por favor intenta de nuevo.');
-      console.error('Login error:', err);
-    } finally {
-      setLoading(false);
+    if (error) {
+      toast.error(error);
+      return;
     }
+
+    router.push('/dashboard');
+    router.refresh();
   };
 
   const handleDemoLogin = (email: string, password: string) => {
-    setEmail(email);
-    setPassword(password);
-    setError(null);
+    form.setValue('email', email);
+    form.setValue('password', password);
   };
 
   return (
-    <div className="w-full max-w-md px-4">
+    <div className="w-full max-w-md px-4" data-testid="loginPage">
       <Card className="shadow-xl">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
@@ -100,57 +94,86 @@ export default function LoginPage() {
             </AlertDescription>
           </Alert>
 
-          {/* Error alert */}
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Login form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="tu@email.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="email"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="tu@email.com"
+                        autoComplete="email"
+                        disabled={isSubmitting}
+                        data-testid="login-email-input"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="current-password"
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Iniciando sesión...
-                </>
-              ) : (
-                'Iniciar Sesión'
-              )}
-            </Button>
-          </form>
 
-          <div className="text-center text-sm text-muted-foreground">
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña</FormLabel>
+                    <FormControl>
+                      <PasswordInput
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        disabled={isSubmitting}
+                        data-testid="login-password-input"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage data-testid="login-error-alert" />
+                  </FormItem>
+                )}
+              />
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isSubmitting}
+                data-testid="login-submit-btn"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Iniciando sesión...
+                  </>
+                ) : (
+                  'Iniciar Sesión'
+                )}
+              </Button>
+            </form>
+          </Form>
+
+          <div className="text-center text-sm text-muted-foreground space-y-2">
             <p>
-              ¿Olvidaste tu contraseña?{' '}
-              <button className="text-primary hover:underline">Recuperar</button>
+              <Link
+                href="/forgot-password"
+                className="text-primary hover:underline"
+                data-testid="login-forgot-password-link"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </p>
+            <p>
+              ¿No tienes cuenta?{' '}
+              <Link
+                href="/register"
+                className="text-primary hover:underline font-medium"
+                data-testid="login-register-link"
+              >
+                Regístrate
+              </Link>
             </p>
           </div>
         </CardContent>
