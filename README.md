@@ -1,5 +1,7 @@
 # BIG PICTURE - Arquitectura Completa del Repositorio
 
+[![CI/CD Pipeline](https://github.com/gaslessqa/people-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/gaslessqa/people-hub/actions/workflows/ci.yml)
+
 ## Estructura Visual Completa
 
 ```
