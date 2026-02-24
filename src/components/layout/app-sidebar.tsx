@@ -11,6 +11,7 @@ import {
   LogOut,
   ChevronUp,
   ShieldCheck,
+  Tags,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/auth-context';
@@ -73,6 +74,13 @@ const adminNavItems = [
     title: 'Gestión de Usuarios',
     url: '/admin/users',
     icon: ShieldCheck,
+    roles: ['super_admin'],
+  },
+  {
+    title: 'Configuración de Estados',
+    url: '/admin/statuses',
+    icon: Tags,
+    roles: ['hr_admin', 'super_admin'],
   },
 ];
 
@@ -181,25 +189,27 @@ export function AppSidebar({ user: userProp }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {user?.role === 'super_admin' && (
+        {(user?.role === 'super_admin' || user?.role === 'hr_admin') && (
           <SidebarGroup>
             <SidebarGroupLabel>Administración</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminNavItems.map(item => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
-                      tooltip={item.title}
-                    >
-                      <Link href={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {adminNavItems
+                  .filter(item => user?.role && item.roles.includes(user.role))
+                  .map(item => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                        tooltip={item.title}
+                      >
+                        <Link href={item.url}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
