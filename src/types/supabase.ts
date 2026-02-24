@@ -1,5 +1,5 @@
 /**
- * Supabase Database Types
+ * Supabase Database Types - Auto-generated 2026-02-18
  *
  * This file contains auto-generated TypeScript types from the Supabase database schema.
  *
@@ -18,7 +18,7 @@ export type Database = {
       activity_log: {
         Row: {
           id: string;
-          person_id: string;
+          person_id: string | null;
           performed_by: string;
           action_type: string;
           old_value: Json | null;
@@ -28,7 +28,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          person_id: string;
+          person_id?: string | null;
           performed_by: string;
           action_type: string;
           old_value?: Json | null;
@@ -38,7 +38,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          person_id?: string;
+          person_id?: string | null;
           performed_by?: string;
           action_type?: string;
           old_value?: Json | null;

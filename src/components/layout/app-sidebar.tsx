@@ -10,6 +10,8 @@ import {
   Settings,
   LogOut,
   ChevronUp,
+  ShieldCheck,
+  Tags,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/auth-context';
@@ -64,6 +66,21 @@ const settingsNavItems = [
     title: 'Configuración',
     url: '/settings',
     icon: Settings,
+  },
+];
+
+const adminNavItems = [
+  {
+    title: 'Gestión de Usuarios',
+    url: '/admin/users',
+    icon: ShieldCheck,
+    roles: ['super_admin'],
+  },
+  {
+    title: 'Configuración de Estados',
+    url: '/admin/statuses',
+    icon: Tags,
+    roles: ['hr_admin', 'super_admin'],
   },
 ];
 
@@ -171,6 +188,32 @@ export function AppSidebar({ user: userProp }: AppSidebarProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {(user?.role === 'super_admin' || user?.role === 'hr_admin') && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administración</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminNavItems
+                  .filter(item => user?.role && item.roles.includes(user.role))
+                  .map(item => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                        tooltip={item.title}
+                      >
+                        <Link href={item.url}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
@@ -223,7 +266,11 @@ export function AppSidebar({ user: userProp }: AppSidebarProps) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut} className="text-destructive">
+                <DropdownMenuItem
+                  onClick={signOut}
+                  className="text-destructive"
+                  data-testid="logout-btn"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Cerrar sesión
                 </DropdownMenuItem>
