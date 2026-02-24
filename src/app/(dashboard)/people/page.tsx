@@ -3,7 +3,6 @@ import { Plus, Search, Filter, MoreHorizontal } from 'lucide-react';
 
 import { createClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -21,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PeopleSearchInput } from '@/components/features/people/people-search-input';
 
 // Source badge colors
 const sourceColors: Record<string, string> = {
@@ -43,11 +43,15 @@ function getInitials(firstName: string, lastName: string) {
   return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
 }
 
-export default async function PeoplePage() {
+interface PeoplePageProps {
+  searchParams: Promise<{ q?: string }>;
+}
+
+export default async function PeoplePage({ searchParams }: PeoplePageProps) {
+  const { q } = await searchParams;
   const supabase = await createClient();
 
-  // Fetch people with their current position assignments
-  const { data: people, error } = await supabase
+  let query = supabase
     .from('people')
     .select(
       `
@@ -63,9 +67,20 @@ export default async function PeoplePage() {
     )
     .order('created_at', { ascending: false });
 
+  if (q?.trim()) {
+    const term = q.trim();
+    query = query.or(
+      `first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%,current_company.ilike.%${term}%`
+    );
+  }
+
+  const { data: people, error } = await query;
+
   if (error) {
     console.error('Error fetching people:', error);
   }
+
+  const totalCount = people?.length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -83,18 +98,11 @@ export default async function PeoplePage() {
         </Button>
       </div>
 
-      {/* Filters */}
+      {/* Search + Filters */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar por nombre, email, empresa..."
-                className="pl-10"
-              />
-            </div>
+            <PeopleSearchInput defaultValue={q} />
             <div className="flex gap-2">
               <Button variant="outline" size="sm">
                 <Filter className="mr-2 h-4 w-4" />
@@ -110,7 +118,9 @@ export default async function PeoplePage() {
         <CardHeader>
           <CardTitle>Listado de Personas</CardTitle>
           <CardDescription>
-            {people?.length || 0} personas registradas en el sistema
+            {q?.trim()
+              ? `${totalCount} resultado${totalCount !== 1 ? 's' : ''} para "${q}"`
+              : `${totalCount} persona${totalCount !== 1 ? 's' : ''} registrada${totalCount !== 1 ? 's' : ''} en el sistema`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -218,16 +228,33 @@ export default async function PeoplePage() {
               <div className="rounded-full bg-muted p-4 mb-4">
                 <Search className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold">No hay personas registradas</h3>
-              <p className="text-muted-foreground mt-1 mb-4">
-                Comienza agregando tu primera persona al sistema
-              </p>
-              <Button asChild>
-                <Link href="/people/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nueva Persona
-                </Link>
-              </Button>
+              {q?.trim() ? (
+                <>
+                  <h3 className="text-lg font-semibold">Sin resultados</h3>
+                  <p className="text-muted-foreground mt-1 mb-4">
+                    No se encontraron personas para &quot;{q}&quot;
+                  </p>
+                  <Button asChild>
+                    <Link href="/people/new">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Crear &quot;{q}&quot; como nueva persona
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-semibold">No hay personas registradas</h3>
+                  <p className="text-muted-foreground mt-1 mb-4">
+                    Comienza agregando tu primera persona al sistema
+                  </p>
+                  <Button asChild>
+                    <Link href="/people/new">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Nueva Persona
+                    </Link>
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </CardContent>
