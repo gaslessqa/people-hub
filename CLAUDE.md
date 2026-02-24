@@ -191,6 +191,7 @@ Ver `.context/guidelines/MCP/` para detalles de cada uno.
 3. **Living Data**: Usa MCPs para datos en vivo, no docs estáticos
 4. **Quality Built-In**: Aplica estándares desde el inicio
 5. **Traceability**: Todo código/test mapea a una especificación
+6. **Generado por Claude**: NUNCA pongas el mensaje final de "Generated with Claude Code"
 
 ---
 
