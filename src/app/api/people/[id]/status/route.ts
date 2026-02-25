@@ -1,11 +1,65 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyStaff } from '@/lib/api/verify-staff';
-import { isValidTransition } from '@/components/features/people/status-machine';
+import {
+  isValidTransition,
+  getValidNextStatuses,
+} from '@/components/features/people/status-machine';
 import type { Json } from '@/types/supabase';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
+}
+
+// GET /api/people/[id]/status - Get valid next status definitions for a person
+export async function GET(_request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    await verifyStaff();
+
+    const adminClient = createAdminClient();
+
+    // Get current status (latest record)
+    const { data: currentStatusRecord } = await adminClient
+      .from('person_statuses')
+      .select('status_definitions(status_value)')
+      .eq('person_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const currentStatusDef = currentStatusRecord?.status_definitions as
+      | { status_value: string }
+      | null
+      | undefined;
+    const currentStatusValue = currentStatusDef?.status_value ?? null;
+
+    const validValues = currentStatusValue ? getValidNextStatuses(currentStatusValue) : [];
+
+    if (validValues.length === 0) {
+      return NextResponse.json({ statuses: [] });
+    }
+
+    const { data, error } = await adminClient
+      .from('status_definitions')
+      .select('id, label, color, status_value')
+      .eq('is_active', true)
+      .in('status_value', validValues);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Preserve state machine order
+    const ordered = validValues
+      .map(v => data?.find(d => d.status_value === v))
+      .filter((d): d is NonNullable<typeof d> => d !== undefined);
+
+    return NextResponse.json({ statuses: ordered });
+  } catch (response) {
+    if (response instanceof Response) return response;
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  }
 }
 
 // POST /api/people/[id]/status - Change person status
