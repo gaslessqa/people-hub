@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { createClient } from '@/lib/supabase/client';
 import { getValidNextStatuses } from './status-machine';
 
 interface StatusDefinition {
@@ -66,25 +65,21 @@ export function StatusChangeModal({
     }
 
     setFetching(true);
-    const supabase = createClient();
-    supabase
-      .from('status_definitions')
-      .select('id, label, color, status_value')
-      .eq('is_active', true)
-      .in('status_value', validValues)
-      .then(({ data, error }) => {
-        if (error) {
-          toast.error('No se pudieron cargar los estados disponibles.');
-        } else {
-          // Preserve state machine order
-          const ordered = validValues
-            .map(v => data?.find(d => d.status_value === v))
-            .filter((d): d is StatusDefinition => d !== undefined);
-          setStatuses(ordered);
-        }
+    fetch(`/api/people/${personId}/status`)
+      .then(res => {
+        if (!res.ok) throw new Error('fetch failed');
+        return res.json() as Promise<{ statuses: StatusDefinition[] }>;
+      })
+      .then(({ statuses }) => {
+        setStatuses(statuses ?? []);
+      })
+      .catch(() => {
+        toast.error('No se pudieron cargar los estados disponibles.');
+      })
+      .finally(() => {
         setFetching(false);
       });
-  }, [open, currentStatusValue]);
+  }, [open, currentStatusValue, personId]);
 
   async function handleConfirm() {
     if (!selectedId) return;
