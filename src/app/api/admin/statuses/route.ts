@@ -1,16 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyHrAdmin } from '@/lib/api/verify-hr-admin';
 import { createStatusSchema } from '@/lib/schemas/statuses';
 
 // GET /api/admin/statuses - Fetch all status definitions
 export async function GET() {
   try {
-    await verifyHrAdmin();
+    const { supabase } = await verifyHrAdmin();
 
-    const adminClient = createAdminClient();
-
-    const { data, error } = await adminClient
+    const { data, error } = await supabase
       .from('status_definitions')
       .select('id, status_type, status_value, label, color, order_index, is_active')
       .order('status_type', { ascending: true })
@@ -30,7 +27,7 @@ export async function GET() {
 // POST /api/admin/statuses - Create new status definition
 export async function POST(request: NextRequest) {
   try {
-    await verifyHrAdmin();
+    const { supabase } = await verifyHrAdmin();
 
     const body: unknown = await request.json();
     const parsed = createStatusSchema.safeParse(body);
@@ -44,10 +41,8 @@ export async function POST(request: NextRequest) {
 
     const { status_type, status_value, label, color, order_index } = parsed.data;
 
-    const adminClient = createAdminClient();
-
     // Check uniqueness of status_value within the same type
-    const { data: existing } = await adminClient
+    const { data: existing } = await supabase
       .from('status_definitions')
       .select('id')
       .eq('status_type', status_type)
@@ -63,7 +58,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await adminClient
+    const { data, error } = await supabase
       .from('status_definitions')
       .insert({ status_type, status_value, label, color, order_index, is_active: true })
       .select('id, status_type, status_value, label, color, order_index, is_active')

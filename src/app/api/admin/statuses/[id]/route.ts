@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyHrAdmin } from '@/lib/api/verify-hr-admin';
 import { updateStatusSchema } from '@/lib/schemas/statuses';
 
@@ -11,7 +10,7 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    await verifyHrAdmin();
+    const { supabase } = await verifyHrAdmin();
 
     const body: unknown = await request.json();
     const parsed = updateStatusSchema.safeParse(body);
@@ -27,9 +26,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ message: 'Sin cambios' });
     }
 
-    const adminClient = createAdminClient();
-
-    const { data, error } = await adminClient
+    const { data, error } = await supabase
       .from('status_definitions')
       .update(parsed.data)
       .eq('id', id)
@@ -55,12 +52,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    await verifyHrAdmin();
-
-    const adminClient = createAdminClient();
+    const { supabase } = await verifyHrAdmin();
 
     // Verify the status definition exists
-    const { data: statusDef, error: fetchError } = await adminClient
+    const { data: statusDef, error: fetchError } = await supabase
       .from('status_definitions')
       .select('id, label, status_value')
       .eq('id', id)
@@ -71,7 +66,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Check if any person currently uses this status
-    const { count, error: countError } = await adminClient
+    const { count, error: countError } = await supabase
       .from('person_statuses')
       .select('id', { count: 'exact', head: true })
       .eq('status_definition_id', id);
@@ -90,7 +85,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Soft-delete: set is_active = false
-    const { error: updateError } = await adminClient
+    const { error: updateError } = await supabase
       .from('status_definitions')
       .update({ is_active: false })
       .eq('id', id);

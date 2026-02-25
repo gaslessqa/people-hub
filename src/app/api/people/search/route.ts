@@ -1,11 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyStaff } from '@/lib/api/verify-staff';
 
 // GET /api/people/search?q=&limit=10&field=email
 export async function GET(request: NextRequest) {
   try {
-    await verifyStaff();
+    const { supabase } = await verifyStaff();
 
     const { searchParams } = request.nextUrl;
     const q = searchParams.get('q')?.trim() ?? '';
@@ -16,9 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    const adminClient = createAdminClient();
-
-    let query = adminClient
+    let query = supabase
       .from('people')
       .select(
         `
