@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyStaff } from '@/lib/api/verify-staff';
 import {
   isValidTransition,
@@ -15,12 +14,10 @@ interface RouteParams {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    await verifyStaff();
-
-    const adminClient = createAdminClient();
+    const { supabase } = await verifyStaff();
 
     // Get current status (latest record)
-    const { data: currentStatusRecord } = await adminClient
+    const { data: currentStatusRecord } = await supabase
       .from('person_statuses')
       .select('status_definitions(status_value)')
       .eq('person_id', id)
@@ -40,7 +37,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ statuses: [] });
     }
 
-    const { data, error } = await adminClient
+    const { data, error } = await supabase
       .from('status_definitions')
       .select('id, label, color, status_value')
       .eq('is_active', true)
@@ -58,8 +55,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ statuses: ordered });
   } catch (response) {
     if (response instanceof Response) return response;
-    const msg = response instanceof Error ? response.message : String(response);
-    return NextResponse.json({ error: 'Error interno del servidor', detail: msg }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
@@ -67,7 +63,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const { profile: staffProfile } = await verifyStaff();
+    const { profile: staffProfile, supabase } = await verifyStaff();
 
     const body: unknown = await request.json();
 
@@ -91,10 +87,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const adminClient = createAdminClient();
-
     // Verify person exists
-    const { data: person, error: personError } = await adminClient
+    const { data: person, error: personError } = await supabase
       .from('people')
       .select('id')
       .eq('id', id)
@@ -105,7 +99,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get current status (latest record)
-    const { data: currentStatusRecord } = await adminClient
+    const { data: currentStatusRecord } = await supabase
       .from('person_statuses')
       .select('status_definitions(status_value, label)')
       .eq('person_id', id)
@@ -120,7 +114,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const currentStatusValue = currentStatusDef?.status_value ?? null;
 
     // Fetch the new status definition
-    const { data: newStatusDef, error: statusDefError } = await adminClient
+    const { data: newStatusDef, error: statusDefError } = await supabase
       .from('status_definitions')
       .select('id, label, color, status_value, status_type')
       .eq('id', status_definition_id)
@@ -146,7 +140,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Insert new status record
-    const { error: insertError } = await adminClient.from('person_statuses').insert({
+    const { error: insertError } = await supabase.from('person_statuses').insert({
       person_id: id,
       status_definition_id,
       comment: typeof comment === 'string' && comment.trim() ? comment.trim() : null,
@@ -163,7 +157,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         ? `Estado cambiado a "${newStatusDef.label}": ${comment}`
         : `Estado cambiado a "${newStatusDef.label}"`;
 
-      await adminClient.from('activity_log').insert({
+      await supabase.from('activity_log').insert({
         person_id: id,
         performed_by: staffProfile.id,
         action_type: 'status_changed',
