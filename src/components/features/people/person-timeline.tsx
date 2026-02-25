@@ -17,7 +17,14 @@ function getActionIcon(actionType: string) {
   switch (actionType) {
     case 'person_created':
       return <UserPlus className="h-4 w-4" />;
+    case 'person_updated':
+      return <User className="h-4 w-4" />;
     case 'status_changed':
+    case 'status_change':
+      return <ArrowUpDown className="h-4 w-4" />;
+    case 'stage_changed':
+    case 'position_assigned':
+    case 'assigned_to_position':
       return <ArrowUpDown className="h-4 w-4" />;
     case 'note_added':
       return <FileText className="h-4 w-4" />;

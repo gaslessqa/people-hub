@@ -20,6 +20,7 @@ const stageColors: Record<string, string> = {
   applied: 'bg-cyan-100 text-cyan-700',
   screening: 'bg-yellow-100 text-yellow-700',
   interviewing: 'bg-orange-100 text-orange-700',
+  finalist: 'bg-indigo-100 text-indigo-700',
   offer: 'bg-purple-100 text-purple-700',
   hired: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
