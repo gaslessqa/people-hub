@@ -69,14 +69,6 @@ jobs:
     name: 🏗️ Build
     runs-on: ubuntu-latest
     needs: test
-    env:
-      # Fallback placeholder values ensure the build succeeds even when secrets
-      # are not configured. The actual deployed build is done by Vercel using
-      # its own environment variables, so these placeholders are never used in
-      # production.
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-build-only' }}
-      NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -90,7 +82,17 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build project
+        # Use placeholder env vars for this sanity-check build.
+        # @supabase/ssr validates the URL format at initialisation time, which
+        # runs during Next.js static page generation even for client components.
+        # Vercel performs the real production build with actual credentials from
+        # its own project settings, so these values are never used in any
+        # deployed environment.
         run: bun run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-build-only
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Job 4: Deploy to Staging (runs after build, only on push to staging)
