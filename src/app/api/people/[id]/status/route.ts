@@ -58,7 +58,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ statuses: ordered });
   } catch (response) {
     if (response instanceof Response) return response;
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    const msg = response instanceof Error ? response.message : String(response);
+    return NextResponse.json({ error: 'Error interno del servidor', detail: msg }, { status: 500 });
   }
 }
 
