@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyStaff } from '@/lib/api/verify-staff';
 import { updatePersonSchema } from '@/lib/schemas/people';
 import type { Json } from '@/types/supabase';
@@ -12,27 +11,22 @@ interface RouteParams {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    await verifyStaff();
-
-    const adminClient = createAdminClient();
+    const { supabase } = await verifyStaff();
 
     // Fetch person, status history, positions, and timeline in parallel
     const [personResult, statusHistoryResult, positionsResult, timelineResult] = await Promise.all([
-      adminClient.from('people').select('*').eq('id', id).single(),
+      supabase.from('people').select('*').eq('id', id).single(),
 
-      adminClient
+      supabase
         .from('person_statuses')
         .select('id, created_at, comment, changed_by, status_definitions(*)')
         .eq('person_id', id)
         .order('created_at', { ascending: false })
         .limit(10),
 
-      adminClient
-        .from('person_positions')
-        .select('stage, positions(id, title)')
-        .eq('person_id', id),
+      supabase.from('person_positions').select('stage, positions(id, title)').eq('person_id', id),
 
-      adminClient
+      supabase
         .from('activity_log')
         .select('action_type, description, created_at, performed_by')
         .eq('person_id', id)
@@ -55,7 +49,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const performedByIds = [...new Set((timelineResult.data ?? []).map(e => e.performed_by))];
     let profileMap: Record<string, string> = {};
     if (performedByIds.length > 0) {
-      const { data: profiles } = await adminClient
+      const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name')
         .in('id', performedByIds);
@@ -108,7 +102,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const { profile: staffProfile } = await verifyStaff();
+    const { profile: staffProfile, supabase } = await verifyStaff();
 
     const rawBody: Record<string, unknown> = await request.json();
 
@@ -123,10 +117,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const adminClient = createAdminClient();
-
     // Fetch current person
-    const { data: currentPerson, error: fetchError } = await adminClient
+    const { data: currentPerson, error: fetchError } = await supabase
       .from('people')
       .select('*')
       .eq('id', id)
@@ -179,7 +171,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Apply update
     const now = new Date().toISOString();
-    const { error: updateError } = await adminClient
+    const { error: updateError } = await supabase
       .from('people')
       .update({ ...updateData, updated_at: now })
       .eq('id', id);
@@ -191,7 +183,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Log activity
     try {
       const changedLabels = changedFields.join(', ');
-      await adminClient.from('activity_log').insert({
+      await supabase.from('activity_log').insert({
         person_id: id,
         performed_by: staffProfile.id,
         action_type: 'person_updated',

@@ -1,12 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyStaff } from '@/lib/api/verify-staff';
 import { createPersonSchema } from '@/lib/schemas/people';
 
 // POST /api/people - Create a new person record
 export async function POST(request: NextRequest) {
   try {
-    const { profile: staffProfile } = await verifyStaff();
+    const { profile: staffProfile, supabase } = await verifyStaff();
 
     const body: unknown = await request.json();
     const parsed = createPersonSchema.safeParse(body);
@@ -19,12 +18,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { notes, linkedin_url, ...personData } = parsed.data;
-    const adminClient = createAdminClient();
 
     // Check for existing person with same email (warning only, not error)
     let emailWarning: { existing_person_id: string; existing_person_name: string } | undefined;
 
-    const { data: existingPerson } = await adminClient
+    const { data: existingPerson } = await supabase
       .from('people')
       .select('id, first_name, last_name')
       .eq('email', personData.email)
@@ -38,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert new person
-    const { data: newPerson, error: insertError } = await adminClient
+    const { data: newPerson, error: insertError } = await supabase
       .from('people')
       .insert({
         ...personData,
@@ -56,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find the 'lead' status definition (first candidate status)
-    const { data: leadStatus } = await adminClient
+    const { data: leadStatus } = await supabase
       .from('status_definitions')
       .select('id')
       .eq('status_type', 'candidate')
@@ -66,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     // Insert initial status (lead)
     if (leadStatus) {
-      await adminClient.from('person_statuses').insert({
+      await supabase.from('person_statuses').insert({
         person_id: newPerson.id,
         status_definition_id: leadStatus.id,
         changed_by: staffProfile.id,
@@ -79,7 +77,7 @@ export async function POST(request: NextRequest) {
         ? `Persona creada. Nota inicial: ${notes}`
         : `Persona ${personData.first_name} ${personData.last_name} registrada en el sistema`;
 
-      await adminClient.from('activity_log').insert({
+      await supabase.from('activity_log').insert({
         person_id: newPerson.id,
         performed_by: staffProfile.id,
         action_type: 'person_created',
