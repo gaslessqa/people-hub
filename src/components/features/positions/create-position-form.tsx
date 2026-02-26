@@ -66,9 +66,9 @@ export function CreatePositionForm() {
 
   const { isSubmitting } = form.formState;
 
-  // Fetch manager profiles
+  // Fetch manager profiles (accessible to all staff roles)
   useEffect(() => {
-    fetch('/api/admin/users?role=manager')
+    fetch('/api/profiles?role=manager')
       .then(res => (res.ok ? res.json() : []))
       .then((data: ManagerOption[]) => setManagers(data))
       .catch(() => {

@@ -58,6 +58,7 @@ export default async function PositionDetailPage({ params }: PageProps) {
       ),
       person_positions (
         id,
+        person_id,
         stage,
         assigned_at,
         updated_at,
@@ -88,7 +89,7 @@ export default async function PositionDetailPage({ params }: PageProps) {
   const candidates: PipelineCandidate[] = ((position.person_positions ?? []) as RawPP[]).map(
     pp => ({
       id: pp.id,
-      person_id: (pp as { person_id?: string }).person_id ?? '',
+      person_id: (pp as unknown as { person_id: string }).person_id,
       stage: pp.stage as PipelineStageValue,
       person: pp.people
         ? {
