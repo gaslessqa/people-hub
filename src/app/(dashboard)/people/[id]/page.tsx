@@ -8,6 +8,8 @@ import { PersonHeader } from '@/components/features/people/person-header';
 import { PersonDetails } from '@/components/features/people/person-details';
 import { PersonTimeline } from '@/components/features/people/person-timeline';
 import { PersonPositions } from '@/components/features/people/person-positions';
+import { PersonNotes } from '@/components/features/people/person-notes';
+import { PersonFeedback } from '@/components/features/people/person-feedback';
 import { ChangeStatusButton } from '@/components/features/people/change-status-button';
 
 interface PersonProfilePageProps {
@@ -18,8 +20,15 @@ export default async function PersonProfilePage({ params }: PersonProfilePagePro
   const { id } = await params;
   const supabase = await createClient();
 
-  // Fetch person + status history + positions + timeline in parallel
-  const [personResult, statusHistoryResult, positionsResult, timelineResult] = await Promise.all([
+  // Fetch person + status history + positions + timeline + notes + feedback in parallel
+  const [
+    personResult,
+    statusHistoryResult,
+    positionsResult,
+    timelineResult,
+    notesResult,
+    feedbackResult,
+  ] = await Promise.all([
     supabase.from('people').select('*').eq('id', id).single(),
 
     supabase
@@ -33,10 +42,22 @@ export default async function PersonProfilePage({ params }: PersonProfilePagePro
 
     supabase
       .from('activity_log')
-      .select('action_type, description, created_at, performed_by')
+      .select('action_type, description, created_at, performed_by, new_value')
       .eq('person_id', id)
       .order('created_at', { ascending: false })
-      .limit(20),
+      .limit(50),
+
+    supabase
+      .from('notes')
+      .select('*')
+      .eq('person_id', id)
+      .order('created_at', { ascending: false }),
+
+    supabase
+      .from('feedback')
+      .select('*')
+      .eq('person_id', id)
+      .order('created_at', { ascending: false }),
   ]);
 
   if (personResult.error || !personResult.data) {
@@ -56,15 +77,23 @@ export default async function PersonProfilePage({ params }: PersonProfilePagePro
     ? { label: currentStatusDef.label, color: currentStatusDef.color }
     : null;
 
-  // Resolve performed_by names in bulk
+  // Collect all profile IDs that need name resolution
   const rawTimeline = timelineResult.data ?? [];
-  const performedByIds = [...new Set(rawTimeline.map(e => e.performed_by))];
+  const rawNotes = notesResult.data ?? [];
+  const rawFeedback = feedbackResult.data ?? [];
+
+  const profileIds = new Set([
+    ...rawTimeline.map(e => e.performed_by),
+    ...rawNotes.map(n => n.created_by),
+    ...rawFeedback.map(f => f.given_by),
+  ]);
+
   let profileMap: Record<string, string> = {};
-  if (performedByIds.length > 0) {
+  if (profileIds.size > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name')
-      .in('id', performedByIds);
+      .in('id', [...profileIds]);
     profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p.full_name]));
   }
 
@@ -73,6 +102,17 @@ export default async function PersonProfilePage({ params }: PersonProfilePagePro
     description: entry.description,
     performed_by_name: profileMap[entry.performed_by] ?? null,
     created_at: entry.created_at,
+    new_value: entry.new_value as Record<string, unknown> | null,
+  }));
+
+  const notes = rawNotes.map(note => ({
+    ...note,
+    created_by_name: profileMap[note.created_by] ?? null,
+  }));
+
+  const feedback = rawFeedback.map(fb => ({
+    ...fb,
+    given_by_name: profileMap[fb.given_by] ?? null,
   }));
 
   const positions = (positionsResult.data ?? []).map(pp => {
@@ -83,6 +123,11 @@ export default async function PersonProfilePage({ params }: PersonProfilePagePro
       stage: pp.stage,
     };
   });
+
+  // Positions for feedback filter (deduplicated)
+  const positionsForFilter = positions
+    .filter(p => p.position_id)
+    .map(p => ({ id: p.position_id, title: p.title }));
 
   return (
     <div className="space-y-6" data-testid="personProfilePage">
@@ -119,9 +164,11 @@ export default async function PersonProfilePage({ params }: PersonProfilePagePro
           <PersonDetails person={person} />
         </div>
 
-        {/* Right: positions + timeline */}
+        {/* Right: positions + notes + feedback + timeline */}
         <div className="lg:col-span-2 space-y-6">
           <PersonPositions positions={positions} />
+          <PersonNotes personId={id} initialNotes={notes} />
+          <PersonFeedback personId={id} initialFeedback={feedback} positions={positionsForFilter} />
           <PersonTimeline entries={timeline} />
         </div>
       </div>
