@@ -21,7 +21,7 @@ export const createFeedbackSchema = z.object({
   strengths: z.string().max(2000, 'Máximo 2000 caracteres').optional(),
   concerns: z.string().max(2000, 'Máximo 2000 caracteres').optional(),
   comments: z.string().max(2000, 'Máximo 2000 caracteres'),
-  position_id: z.string().uuid().optional(),
+  position_id: z.string().optional(),
   is_confidential: z.boolean().default(false),
 });
 
