@@ -44,11 +44,11 @@ export function PeopleSearchInput({ defaultValue = '' }: PeopleSearchInputProps)
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
       <Input
         type="search"
-        placeholder="Buscar por nombre, email, empresa..."
+        placeholder="Buscar por nombre, email, teléfono..."
         className="pl-10 pr-10"
         value={value}
         onChange={handleChange}
-        data-testid="people_search_input"
+        data-testid="search-input"
       />
       {value && (
         <Button
@@ -58,6 +58,7 @@ export function PeopleSearchInput({ defaultValue = '' }: PeopleSearchInputProps)
           className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
           onClick={handleClear}
           aria-label="Limpiar búsqueda"
+          data-testid="search-clear-button"
         >
           <X className="h-3 w-3" />
         </Button>
