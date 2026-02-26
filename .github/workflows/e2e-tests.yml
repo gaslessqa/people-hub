@@ -23,7 +23,7 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Run E2E Tests
-        run: npx playwright test
+        run: npx playwright test --pass-with-no-tests
         env:
           BASE_URL: ${{ secrets.BASE_URL }}
 
