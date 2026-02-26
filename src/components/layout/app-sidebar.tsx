@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Users,
   Briefcase,
+  Building2,
   LayoutDashboard,
   MessageSquare,
   Settings,
@@ -58,6 +59,11 @@ const mainNavItems = [
     title: 'Feedback',
     url: '/feedback',
     icon: MessageSquare,
+  },
+  {
+    title: 'Mis Vacantes',
+    url: '/my-vacancies',
+    icon: Building2,
   },
 ];
 
