@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Database } from '@/types/supabase';
 import { verifyStaff } from '@/lib/api/verify-staff';
+
+type UserRole = Database['public']['Enums']['user_role'];
 
 /**
  * GET /api/profiles?role=manager
@@ -10,7 +13,10 @@ export async function GET(request: NextRequest) {
   try {
     const { supabase } = await verifyStaff();
 
-    const role = request.nextUrl.searchParams.get('role');
+    const roleParam = request.nextUrl.searchParams.get('role');
+    const VALID_ROLES: UserRole[] = ['recruiter', 'manager', 'hr_admin', 'super_admin'];
+    const role =
+      roleParam && (VALID_ROLES as string[]).includes(roleParam) ? (roleParam as UserRole) : null;
 
     let query = supabase
       .from('profiles')
