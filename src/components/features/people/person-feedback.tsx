@@ -124,7 +124,7 @@ export function PersonFeedback({ personId, initialFeedback, positions }: PersonF
   const [comments, setComments] = useState('');
   const [strengths, setStrengths] = useState('');
   const [concerns, setConcerns] = useState('');
-  const [selectedPositionId, setSelectedPositionId] = useState('');
+  const [selectedPositionId, setSelectedPositionId] = useState('none');
 
   // Filtered list
   const filtered = useMemo(() => {
@@ -146,7 +146,7 @@ export function PersonFeedback({ personId, initialFeedback, positions }: PersonF
     setComments('');
     setStrengths('');
     setConcerns('');
-    setSelectedPositionId('');
+    setSelectedPositionId('none');
     setShowForm(false);
   };
 
@@ -173,7 +173,7 @@ export function PersonFeedback({ personId, initialFeedback, positions }: PersonF
         comments,
         strengths: strengths || undefined,
         concerns: concerns || undefined,
-        position_id: selectedPositionId || undefined,
+        position_id: selectedPositionId !== 'none' ? selectedPositionId : undefined,
         is_confidential: false,
       };
 
@@ -320,7 +320,7 @@ export function PersonFeedback({ personId, initialFeedback, positions }: PersonF
                     <SelectValue placeholder="Sin vacante específica" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin vacante específica</SelectItem>
+                    <SelectItem value="none">Sin vacante específica</SelectItem>
                     {positions.map(pos => (
                       <SelectItem key={pos.id} value={pos.id}>
                         {pos.title}
