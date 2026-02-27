@@ -21,7 +21,7 @@ export const createPositionSchema = z.object({
   salary_min: z.number().min(0, 'El salario mínimo no puede ser negativo').optional(),
   salary_max: z.number().min(0, 'El salario máximo no puede ser negativo').optional(),
   salary_currency: z.string().max(10, 'La moneda no puede exceder 10 caracteres').optional(),
-  hiring_manager_id: z.string().uuid('ID de manager inválido').optional(),
+  hiring_manager_id: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
 });
 
@@ -32,7 +32,7 @@ export const updatePositionSchema = createPositionSchema.partial();
 export type UpdatePositionFormData = z.infer<typeof updatePositionSchema>;
 
 export const assignCandidateSchema = z.object({
-  person_id: z.string().uuid('ID de persona inválido'),
+  person_id: z.string().min(1, 'ID de persona requerido'),
 });
 
 export type AssignCandidateData = z.infer<typeof assignCandidateSchema>;
@@ -50,7 +50,7 @@ export const closePositionSchema = z.object({
   action: z.enum(['filled', 'cancelled', 'on_hold'], {
     error: 'Acción de cierre inválida',
   }),
-  hired_person_id: z.string().uuid('ID de persona inválido').optional(),
+  hired_person_id: z.string().optional(),
   reason: z.string().max(500).optional(),
 });
 
