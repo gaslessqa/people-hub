@@ -1,25 +1,12 @@
-import { notFound } from 'next/navigation';
 import { RedocViewer } from './redoc-viewer';
 import { ApiDocSelector } from './api-doc-selector';
 import { AuthInfoPanel } from './auth-info-panel';
-
-function isAllowedEnvironment(): boolean {
-  const vercelEnv = process.env.VERCEL_ENV;
-  if (vercelEnv) {
-    return vercelEnv !== 'production';
-  }
-  return process.env.NODE_ENV === 'development';
-}
 
 interface PageProps {
   searchParams: Promise<{ api?: string }>;
 }
 
 export default async function ApiDocuPage({ searchParams }: PageProps) {
-  if (!isAllowedEnvironment()) {
-    notFound();
-  }
-
   const params = await searchParams;
   const apiType = params.api ?? 'nextjs';
 
