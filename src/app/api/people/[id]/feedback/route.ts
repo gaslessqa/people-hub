@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifyAnyRole } from '@/lib/api/verify-any-role';
 import { createFeedbackSchema } from '@/lib/schemas/feedback';
+import { sendNotification } from '@/lib/notifications/service';
+import { buildFeedbackReceivedEmail } from '@/lib/email/templates/feedback-received';
+import { NOTIFICATION_TYPES } from '@/lib/notifications/types';
 import type { Json } from '@/types/supabase';
 
 interface RouteParams {
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Verify person exists
     const { data: person, error: personError } = await supabase
       .from('people')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('id', id)
       .single();
 
@@ -138,9 +141,124 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Audit log failure does not block the operation
     }
 
+    // PH-40: Notify recruiter (non-blocking, skip if feedback is confidential)
+    if (!is_confidential) {
+      void notifyRecruiter({
+        person,
+        positionId: position_id ?? null,
+        managerName: profile.full_name ?? 'Manager',
+        rating,
+        recommendation,
+        comments,
+      });
+    }
+
     return NextResponse.json({ ...fb, given_by_name: profile.full_name }, { status: 201 });
   } catch (err) {
     if (err instanceof Response) return err;
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  }
+}
+
+interface NotifyRecruiterParams {
+  person: { id: string; first_name: string; last_name: string };
+  positionId: string | null;
+  managerName: string;
+  rating: number;
+  recommendation: string;
+  comments: string;
+}
+
+async function notifyRecruiter(params: NotifyRecruiterParams): Promise<void> {
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const adminSupabase = createAdminClient();
+
+    const candidateName = `${params.person.first_name} ${params.person.last_name}`;
+    let positionTitle: string | null = null;
+    let recruiterProfileId: string | null = null;
+    let recruiterEmail: string | null = null;
+    let recruiterName: string | null = null;
+
+    // Resolve position + recruiter from position if available
+    if (params.positionId) {
+      const { data: position } = await adminSupabase
+        .from('positions')
+        .select('title, recruiter_id')
+        .eq('id', params.positionId)
+        .maybeSingle();
+
+      if (position) {
+        positionTitle = position.title;
+
+        if (position.recruiter_id) {
+          const { data: recruiter } = await adminSupabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('id', position.recruiter_id)
+            .maybeSingle();
+
+          if (recruiter?.email) {
+            recruiterProfileId = recruiter.id;
+            recruiterEmail = recruiter.email;
+            recruiterName = recruiter.full_name;
+          }
+        }
+      }
+    }
+
+    // Fallback: find recruiter from person's creator (created_by)
+    if (!recruiterProfileId) {
+      const { data: personRecord } = await adminSupabase
+        .from('people')
+        .select('created_by')
+        .eq('id', params.person.id)
+        .maybeSingle();
+
+      if (personRecord?.created_by) {
+        const { data: creator } = await adminSupabase
+          .from('profiles')
+          .select('id, full_name, email, role')
+          .eq('id', personRecord.created_by)
+          .maybeSingle();
+
+        if (creator?.email && creator.role === 'recruiter') {
+          recruiterProfileId = creator.id;
+          recruiterEmail = creator.email;
+          recruiterName = creator.full_name;
+        }
+      }
+    }
+
+    if (!recruiterProfileId || !recruiterEmail) return;
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+
+    const emailContent = buildFeedbackReceivedEmail({
+      recruiterName: recruiterName ?? 'Recruiter',
+      candidateName,
+      positionTitle,
+      managerName: params.managerName,
+      rating: params.rating,
+      recommendation: params.recommendation,
+      commentsPreview: params.comments,
+      feedbackUrl: `${appUrl}/people/${params.person.id}`,
+    });
+
+    await sendNotification({
+      recipientProfileId: recruiterProfileId,
+      recipientEmail: recruiterEmail,
+      notificationType: NOTIFICATION_TYPES.FEEDBACK_RECEIVED,
+      payload: {
+        person_id: params.person.id,
+        position_id: params.positionId,
+        candidate_name: candidateName,
+        rating: params.rating,
+        recommendation: params.recommendation,
+      },
+      email: { ...emailContent, to: recruiterEmail },
+    });
+  } catch (err) {
+    console.error('[PH-40] Failed to notify recruiter:', err);
   }
 }

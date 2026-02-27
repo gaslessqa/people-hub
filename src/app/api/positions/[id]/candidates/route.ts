@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifyStaff } from '@/lib/api/verify-staff';
 import { assignCandidateSchema } from '@/lib/schemas/positions';
+import { sendNotification } from '@/lib/notifications/service';
+import { buildCandidateAssignedEmail } from '@/lib/email/templates/candidate-assigned';
+import { NOTIFICATION_TYPES } from '@/lib/notifications/types';
 import type { Json } from '@/types/supabase';
 
 interface RouteParams {
@@ -13,10 +16,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const { supabase, profile } = await verifyStaff();
 
-    // Verify position exists and is open
+    // Verify position exists and is open (include hiring_manager_id for notification)
     const { data: position, error: posError } = await supabase
       .from('positions')
-      .select('id, title, status')
+      .select('id, title, status, hiring_manager_id')
       .eq('id', id)
       .single();
 
@@ -43,10 +46,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { person_id } = parsed.data;
 
-    // Verify person exists
+    // Verify person exists (include contact info for email)
     const { data: person, error: personError } = await supabase
       .from('people')
-      .select('id, first_name, last_name')
+      .select('id, first_name, last_name, email, phone')
       .eq('id', person_id)
       .single();
 
@@ -87,7 +90,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Log activity
+    // Log activity (non-blocking)
     try {
       await supabase.from('activity_log').insert({
         person_id,
@@ -100,9 +103,77 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Audit log failure does not block the operation
     }
 
+    // PH-39: Notify manager (non-blocking)
+    if (position.hiring_manager_id) {
+      void notifyManager({
+        managerProfileId: position.hiring_manager_id,
+        person,
+        positionTitle: position.title,
+        positionId: id,
+        recruiterName: profile.full_name ?? 'Recruiter',
+      });
+    }
+
     return NextResponse.json({ id: newAssignment.id }, { status: 201 });
   } catch (response) {
     if (response instanceof Response) return response;
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  }
+}
+
+interface NotifyManagerParams {
+  managerProfileId: string;
+  person: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string | null;
+  };
+  positionTitle: string;
+  positionId: string;
+  recruiterName: string;
+}
+
+async function notifyManager(params: NotifyManagerParams): Promise<void> {
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const adminSupabase = createAdminClient();
+
+    const { data: manager } = await adminSupabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .eq('id', params.managerProfileId)
+      .maybeSingle();
+
+    if (!manager?.email) return;
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+    const candidateName = `${params.person.first_name} ${params.person.last_name}`;
+
+    const emailContent = buildCandidateAssignedEmail({
+      managerName: manager.full_name ?? 'Manager',
+      candidateName,
+      candidateEmail: params.person.email,
+      candidatePhone: params.person.phone,
+      positionTitle: params.positionTitle,
+      recruiterName: params.recruiterName,
+      candidateProfileUrl: `${appUrl}/people/${params.person.id}`,
+    });
+
+    await sendNotification({
+      recipientProfileId: manager.id,
+      recipientEmail: manager.email,
+      notificationType: NOTIFICATION_TYPES.NEW_CANDIDATE_ASSIGNED,
+      payload: {
+        person_id: params.person.id,
+        position_id: params.positionId,
+        position_title: params.positionTitle,
+        candidate_name: candidateName,
+      },
+      email: { ...emailContent, to: manager.email },
+    });
+  } catch (err) {
+    console.error('[PH-39] Failed to notify manager:', err);
   }
 }
