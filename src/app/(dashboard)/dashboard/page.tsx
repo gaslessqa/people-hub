@@ -84,7 +84,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   } = await supabase.auth.getUser();
 
   const { data: currentProfile } = user
-    ? await supabase.from('profiles').select('id, full_name, role').eq('user_id', user.id).single()
+    ? await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .eq('auth_user_id', user.id)
+        .single()
     : { data: null };
 
   const role = currentProfile?.role ?? 'recruiter';
